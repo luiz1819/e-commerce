@@ -133,6 +133,46 @@ async function migrateGuestToUser() {
   const token = (await cookieStore).get("guest_session")?.value;
   if (!token) return;
 
-  await db.delete(guests).where(eq(guests.sessionToken, token));
+  const session = await auth.api.getSession({
+    headers: await headers()
+  });
+
+  const userId = session?.user?.id;
+  if (!userId) return;
+
+  const guestRecord = await db
+    .select()
+    .from(guests)
+    .where(eq(guests.sessionToken, token))
+    .limit(1);
+
+  if (guestRecord.length === 0) {
+    (await cookieStore).delete("guest_session");
+    return;
+  }
+
+  const guestId = guestRecord[0].id;
+
+  const { carts } = await import("@/lib/db/schema/index");
+
+  const guestCarts = await db
+    .select()
+    .from(carts)
+    .where(eq(carts.guestId, guestId));
+
+  if (guestCarts.length > 0) {
+    for (const guestCart of guestCarts) {
+      await db
+        .update(carts)
+        .set({
+          userId,
+          guestId: null,
+          updatedAt: new Date()
+        })
+        .where(eq(carts.id, guestCart.id));
+    }
+  }
+
+  await db.delete(guests).where(eq(guests.id, guestId));
   (await cookieStore).delete("guest_session");
 }
