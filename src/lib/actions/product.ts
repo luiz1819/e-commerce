@@ -282,7 +282,7 @@ export async function getProduct(productId: string): Promise<FullProduct | null>
     .leftJoin(productVariants, eq(productVariants.productId, products.id))
     .leftJoin(colors, eq(colors.id, productVariants.colorId))
     .leftJoin(sizes, eq(sizes.id, productVariants.sizeId))
-    .leftJoin(productImages, eq(productImages.productId, products.id))
+    .leftJoin(productImages, and(eq(productImages.productId, products.id), or(isNull(productImages.variantId), eq(productImages.variantId, productVariants.id))))
     .where(eq(products.id, productId));
 
   if (!rows.length) return null;
